@@ -1,0 +1,53 @@
+* steps to recreate
+
+Intention
+- benchmark cberl's communication with couchbase
+
+Scene
+- 3 db nodes
+- 4 ejabberd nodes
+- the below code is installed on the 4 ejabberd nodes
+
+Setup
+- ensure Erlang 17 is installed
+- mkdir benchmark
+- git clone https://github.com/sjmackenzie/basho_bench.git
+- git clone https://github.com/chitika/cberl.git
+- cd cberl && make all && cd ../basho_bench && make all (beware git dependency is required)
+- vim examples/cberl_bench.config
+-- ensure there are absolute paths to the cberl directory cloned in previous steps !!! important or it won't work
+-- configure cberl_hostport + bucketname (username + password can be blank IIRC)
+
+Iteration 1 - (find each server's maximum load)
+- $ ./basho_bench examples/cberl_bench.config
+
+Iteration 2 - (concurrent run for one minute)
+- adjust ulimit to appropriate levels etc...
+- vim examples/cberl_bench.config
+-- change the concurrent tuple such that you find the upperbound on the system it should be pretty high for a powerful system.
+Set `{concurrent, 100000}`. change this value accordingly.
+If this does not strain the server then keep bumping it till it has reached its maximum load.
+- $ ./basho_bench examples/cberl_bench.config
+- $ rm -fr tests
+
+Iteration 3 - (max load test for 30 mins)
+- Once server maximum load has been found then set `{duration, 30}`
+- $./basho_bench examples/cberl_bench.config
+
+Iteration 4 - (24 hours incremental load test of 4 stages)
+goal: over a 24 hour period the goal is to incrementally increase the load of the database server.
+- set server 1's example/cberl_bench.config {duration, 1440} - equating to 24 hours
+- set server 2's example/cberl_bench.config {duration, 1080} - equating to 24 hours
+- set server 3's example/cberl_bench.config {duration, 720} - equating to 24 hours
+- set server 4's example/cberl_bench.config {duration, 360} - equating to 24 hours
+- set a cronjob on each machine to execute the scripts suchthat:
+- server 1 starts basho_bench examples/cberl_bench.config
+- server 2 fires six hours later
+- server 3 fires six hours after server 2
+- server 4 fires six hours after server 3
+
+!! IMPORTANT !!
+
+test data is kept in the tests folder.
+This data will need to be extracted onto Richard's machine to run a statistics tool over.
+If you misfire any of the above executions due to testing pleas make sure that you delete the appropriate tests/XXX folder.
